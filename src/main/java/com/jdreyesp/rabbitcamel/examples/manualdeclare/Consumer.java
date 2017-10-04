@@ -1,13 +1,15 @@
-package com.jdreyesp.rabbitcamel.examples.deadletter;
+package com.jdreyesp.rabbitcamel.examples.manualdeclare;
 
 import org.apache.camel.CamelContext;
 import org.apache.camel.Exchange;
 import org.apache.camel.Processor;
 import org.apache.camel.builder.RouteBuilder;
+import org.apache.camel.component.rabbitmq.RabbitMQConstants;
 import org.apache.camel.impl.DefaultCamelContext;
+import org.apache.camel.model.language.SimpleExpression;
 
 /**
- * Dead lettered message after 3 times. A log is printed when maximum retry times is reached
+ * Dead lettered message after 3 times with requeue and NACK. A log is printed when maximum retry times is reached
  */
 public class Consumer {
 
@@ -20,25 +22,11 @@ public class Consumer {
             @Override
             public void configure() throws Exception {
                 from("rabbitmq://localhost:5672/retry?" +
-                        "addresses=localhost&" +
-                        "username=guest&" +
-                        "password=guest&" +
-                        "routingKey=#&" +
-                        "queue=retry&" +
-                        "declare=true&" +
-                        "autoAck=false&" +
                         "exchangeType=topic&" +
-                        "prefetchEnabled=true&" +
-                        "prefetchSize=0&" +
-                        "prefetchGlobal=false&" +
-                        "prefetchCount=1&" +
-                        "durable=false&" +
-                        "autoDelete=true&" +
-                        "deadLetterExchange=deadLetterExchange&" +
-                        "deadLetterQueue=deadLetter&" +
-                        "deadLetterRoutingKey=#&" +
-                        "automaticRecoveryEnabled=true")
-                        .to("log:foo");
+                        "queue=retry&" +
+                        "autoAck=false&" +
+                        "deadLetterExchange=deadLetterExchange&deadLetterQueue=deadLetter&deadLetterRoutingKey=pepe")
+                        .bean(consumer, "doWork");
 
             }
         };
@@ -46,6 +34,8 @@ public class Consumer {
         builder.onException(Exception.class)
                 .maximumRedeliveries(3)
                 .redeliveryDelay(0)
+                .handled(true)
+                .setHeader(RabbitMQConstants.REQUEUE, new SimpleExpression("true"))
                 .process(new Processor() {
                     public void process(Exchange exchange) throws Exception {
                         System.out.println("Retried after 3 times!");
